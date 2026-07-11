@@ -152,8 +152,9 @@ class ChatbotGUI:
 
         status = tk.Frame(content, bg=C["bg_header"])
         status.pack(side="right", padx=20, pady=10)
-        tk.Canvas(status, width=8, height=8, bg=C["bg_header"], highlightthickness=0).pack(side="left", padx=(0, 5))
-        status.create_oval(0, 0, 8, 8, fill="#00d2d3", outline="")
+        dot = tk.Canvas(status, width=10, height=10, bg=C["bg_header"], highlightthickness=0)
+        dot.pack(side="left", padx=(0, 5))
+        dot.create_oval(1, 1, 9, 9, fill="#00d2d3", outline="")
         tk.Label(status, text="Online", font=("Segoe UI", 8),
                  bg=C["bg_header"], fg="#00d2d3").pack(side="left")
 
