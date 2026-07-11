@@ -5,19 +5,36 @@ Potenciado por Groq + Llama 3.1 (gratis).
 
 import os
 import sys
+import json
 import random
 import threading
 import requests
 import wikipedia
 import tkinter as tk
-from tkinter import font
+from tkinter import font, messagebox
 from ddgs import DDGS
 
 # ============================================================================
 # CONFIGURACION
 # ============================================================================
 
-API_KEY = os.environ.get("GROQ_API_KEY", "")
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+def load_api_key():
+    key = os.environ.get("GROQ_API_KEY", "")
+    if key:
+        return key
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            data = json.load(f)
+            return data.get("api_key", "")
+    return ""
+
+def save_api_key(key):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump({"api_key": key}, f)
+
+API_KEY = load_api_key()
 
 SYSTEM_PROMPT = """Eres Monica, una asistente inteligente, amigable y conversacional.
 
@@ -80,7 +97,7 @@ def search_context(query):
 # GROQ API
 # ============================================================================
 
-def ask_ai(query):
+def ask_ai(query, api_key):
     try:
         context = search_context(query)
         messages = [
@@ -89,7 +106,7 @@ def ask_ai(query):
         ]
         r = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={"model": "llama-3.1-8b-instant", "messages": messages, "max_tokens": 500},
             timeout=30
         )
@@ -111,13 +128,56 @@ class ChatbotGUI:
         self.root.configure(bg=C["bg_main"])
         self.root.resizable(False, False)
 
+        self.api_key = API_KEY
         self.typing = False
+
+        if not self.api_key:
+            self.show_api_dialog()
+            return
+
         self.setup_fonts()
         self.create_header()
         self.create_chat_area()
         self.create_input_area()
-
         self.add_system("Hola! Soy Monica, tu asistente inteligente. Preguntame lo que quieras!")
+
+    def show_api_dialog(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Configurar API Key")
+        dialog.geometry("400x250")
+        dialog.configure(bg=C["bg_main"])
+        dialog.resizable(False, False)
+        dialog.grab_set()
+
+        tk.Label(dialog, text="Monica AI", font=("Segoe UI", 20, "bold"),
+                 bg=C["bg_main"], fg=C["pink1"]).pack(pady=(20, 5))
+        tk.Label(dialog, text="Necesitas una API key gratis de Groq",
+                 font=("Segoe UI", 10), bg=C["bg_main"], fg=C["text_light"]).pack()
+        tk.Label(dialog, text="Ve a: console.groq.com/keys",
+                 font=("Segoe UI", 9), bg=C["bg_main"], fg=C["pink4"]).pack()
+
+        entry = tk.Entry(dialog, font=("Segoe UI", 11), bg=C["bg_main"],
+                         fg=C["text_white"], insertbackground=C["pink1"],
+                         relief="flat", bd=0)
+        entry.pack(pady=15, ipady=8, padx=30, fill="x")
+
+        def save():
+            key = entry.get().strip()
+            if key:
+                save_api_key(key)
+                self.api_key = key
+                dialog.destroy()
+                self.setup_fonts()
+                self.create_header()
+                self.create_chat_area()
+                self.create_input_area()
+                self.add_system("Hola! Soy Monica, tu asistente inteligente. Preguntame lo que quieras!")
+            else:
+                messagebox.showwarning("Aviso", "Ingresa una API key")
+
+        tk.Button(dialog, text="Guardar", font=("Segoe UI", 11, "bold"),
+                  bg=C["pink1"], fg="white", relief="flat", padx=30, pady=8,
+                  command=save, cursor="hand2").pack()
 
     def setup_fonts(self):
         self.f_title = font.Font(family="Segoe UI", size=18, weight="bold")
@@ -292,7 +352,7 @@ class ChatbotGUI:
         threading.Thread(target=self.get_response, args=(text,), daemon=True).start()
 
     def get_response(self, query):
-        response = ask_ai(query)
+        response = ask_ai(query, self.api_key)
         self.root.after(0, self.on_response, response)
 
     def on_response(self, response):

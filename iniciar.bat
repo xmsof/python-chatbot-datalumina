@@ -1,0 +1,3 @@
+@echo off
+echo Iniciando Monica AI...
+python python_chatbot_gui.py

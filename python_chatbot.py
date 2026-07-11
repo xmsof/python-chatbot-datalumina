@@ -1,10 +1,11 @@
 """
-Chatbot Inteligente by Monica
+Chatbot Inteligente by Monica - Consola
 Potenciado por Groq + Llama 3.1 (gratis).
 """
 
 import os
 import sys
+import json
 import random
 import requests
 import wikipedia
@@ -13,6 +14,22 @@ from ddgs import DDGS
 # ============================================================================
 # CONFIGURACION
 # ============================================================================
+
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+def load_api_key():
+    key = os.environ.get("GROQ_API_KEY", "")
+    if key:
+        return key
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            data = json.load(f)
+            return data.get("api_key", "")
+    return ""
+
+def save_api_key(key):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump({"api_key": key}, f)
 
 SYSTEM_PROMPT = """Eres Monica, una asistente inteligente, amigable y conversacional.
 
@@ -24,22 +41,19 @@ Reglas:
 - No des listas largas ni texto crudo
 - Incluye datos interesantes cuando sea relevante
 - Si no sabes algo, di la verdad pero intenta ayudar
-- Usa emojis moderadamente para hacer la conversacion mas amena
+- Usa emojis moderadamente
 - Responde como lo haria ChatGPT o cualquier IA moderna"""
 
 # ============================================================================
-# BUSQUEDA EN INTERNET (para contexto)
+# BUSQUEDA EN INTERNET
 # ============================================================================
 
 def search_context(query):
-    """Busca informacion en internet para dar contexto."""
     try:
         wikipedia.set_lang("es")
-        summary = wikipedia.summary(query, sentences=4, auto_suggest=True, redirect=True)
-        return summary
+        return wikipedia.summary(query, sentences=4, auto_suggest=True, redirect=True)
     except:
         pass
-
     try:
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=3))
@@ -49,39 +63,28 @@ def search_context(query):
                     return body
     except:
         pass
-
     return None
 
 # ============================================================================
-# GROQ API (Llama 3.1)
+# GROQ API
 # ============================================================================
 
 def ask_ai(query, api_key):
-    """Pregunta a Groq (Llama 3.1)."""
     try:
         context = search_context(query)
-        if context:
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Contexto de internet: {context}\n\nPregunta: {query}"}
-            ]
-        else:
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": query}
-            ]
-
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"Contexto: {context}\nPregunta: {query}" if context else query}
+        ]
         r = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={"model": "llama-3.1-8b-instant", "messages": messages, "max_tokens": 500},
             timeout=30
         )
-
         if r.status_code == 200:
             return r.json()["choices"][0]["message"]["content"]
-        else:
-            return f"Error {r.status_code}: {r.json().get('error', {}).get('message', 'Desconocido')}"
+        return f"Error {r.status_code}"
     except Exception as e:
         return f"Error: {str(e)}"
 
@@ -97,7 +100,19 @@ def main():
     print("=" * 60)
     print()
 
-    api_key = os.environ.get("GROQ_API_KEY", "")
+    api_key = load_api_key()
+
+    if not api_key:
+        print("  Necesitas una API key gratis de Groq.")
+        print("  Ve a: https://console.groq.com/keys")
+        print()
+        api_key = input("  Ingresa tu API key: > ").strip()
+        if not api_key:
+            print("\n  Saliendo...")
+            return
+        save_api_key(api_key)
+        print("  Key guardada! Ya no te la pedire otra vez.")
+        print()
 
     print("  Listo! Preguntame lo que quieras.")
     print()

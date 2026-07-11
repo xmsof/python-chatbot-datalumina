@@ -1,42 +1,75 @@
 # Chatbot Inteligente by Monica
 
-Asistente que busca en internet para responder CUALQUIER pregunta.
+Asistente inteligente que responde CUALQUIER pregunta using Groq + Llama 3.1.
 
-## Como funciona
+## Caracteristicas
 
-Escribe una pregunta y el chatbot busca la respuesta en Wikipedia y DuckDuckGo. Responde sobre cualquier tema: ciencia, historia, tecnologia, recetas, noticias, etc.
+- Responde como una IA real (como ChatGPT)
+- Busca informacion en internet (Wikipedia, DuckDuckGo)
+- Interfaz grafica rosa premium
+- 100% gratis
 
-## Requisitos
+## Como usar
 
-- Python 3.6+
-- `pip install duckduckgo-search wikipedia`
+### 1. Instalar Python
 
-## Uso
+Descarga Python desde https://www.python.org/downloads/
+
+### 2. Instalar dependencias
 
 ```bash
-pip install duckduckgo-search wikipedia
+pip install requests ddgs wikipedia
+```
+
+### 3. Obtener API key gratis (Groq)
+
+1. Ve a https://console.groq.com/keys
+2. Crea una cuenta gratis
+3. Dale a "Create API Key"
+4. Copia la key
+
+### 4. Configurar la API key
+
+**Windows (PowerShell):**
+```powershell
+setx GROQ_API_KEY "tu-api-key-aqui"
+```
+
+**Mac/Linux:**
+```bash
+export GROQ_API_KEY="tu-api-key-aqui"
+```
+
+### 5. Ejecutar
+
+**Version consola:**
+```bash
 python python_chatbot.py
 ```
 
-## Comandos
+**Version grafica (GUI):**
+```bash
+python python_chatbot_gui.py
+```
 
-| Comando | Descripcion |
-|---------|-------------|
-| `/ayuda` | Ayuda |
-| `/web` | Busqueda directa |
-| `/salir` | Salir |
-
-## Ejemplos
+## Ejemplos de preguntas
 
 ```
-Que es la inteligencia artificial?
+Que es una pizza?
+Que es bitcoin?
+Como funciona el internet?
+Contame un chiste
 Quien creo Python?
-Como funciona el blockchain?
-Cual es la capital de Japon?
-Mejores peliculas de 2024
 Receta de tacos al pastor
-/web noticias de hoy
 ```
+
+## Tecnologias
+
+- Python 3.6+
+- Groq API (Llama 3.1 8B)
+- Wikipedia API
+- DuckDuckGo Search
+- Tkinter (GUI)
 
 ## Licencia
 
