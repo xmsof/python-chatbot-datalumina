@@ -1,104 +1,89 @@
 """
 Chatbot Inteligente by Monica
-Respuestas cortas, claras y en espanol.
+Potenciado por Groq + Llama 3.1 (gratis).
 """
 
+import os
 import sys
-import textwrap
 import random
 import requests
-from bs4 import BeautifulSoup
+import wikipedia
 from ddgs import DDGS
 
 # ============================================================================
-# BUSQUEDA EN INTERNET
+# CONFIGURACION
 # ============================================================================
 
-PAGES_TO_SKIP = ["dictionary", "cambridge", "wordreference", "spanishdict",
-                 "reverso", "larousse", "wiktionary", "merriam", "oxford",
-                 "youtube.com", "twitter.com", "facebook.com", "instagram",
-                 "tiktok", "pinterest", "amazon", "mercadolibre"]
+SYSTEM_PROMPT = """Eres Monica, una asistente inteligente, amigable y conversacional.
 
-def search_web(query):
-    """Busca en DuckDuckGo."""
+Reglas:
+- Responde SOLO en espanol
+- Se concisa pero completa (maximo 4-5 oraciones)
+- Habla de forma natural y amigable
+- Si te preguntan algo, responde directamente
+- No des listas largas ni texto crudo
+- Incluye datos interesantes cuando sea relevante
+- Si no sabes algo, di la verdad pero intenta ayudar
+- Usa emojis moderadamente para hacer la conversacion mas amena
+- Responde como lo haria ChatGPT o cualquier IA moderna"""
+
+# ============================================================================
+# BUSQUEDA EN INTERNET (para contexto)
+# ============================================================================
+
+def search_context(query):
+    """Busca informacion en internet para dar contexto."""
+    try:
+        wikipedia.set_lang("es")
+        summary = wikipedia.summary(query, sentences=4, auto_suggest=True, redirect=True)
+        return summary
+    except:
+        pass
+
     try:
         with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=8))
-            filtered = []
+            results = list(ddgs.text(query, max_results=3))
             for r in results:
-                link = r.get("href", "")
-                if not any(skip in link.lower() for skip in PAGES_TO_SKIP):
-                    filtered.append(r)
-            return filtered
+                body = r.get("body", "")
+                if body and len(body) > 50:
+                    return body
     except:
-        return []
+        pass
 
-def fetch_page(url, max_chars=2000):
-    """Obtiene contenido limpio de una pagina."""
-    try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        response = requests.get(url, headers=headers, timeout=8)
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        for tag in soup(["script", "style", "nav", "footer", "header",
-                         "aside", "form", "button", "img", "iframe",
-                         "noscript", "svg", "figure", "figcaption"]):
-            tag.decompose()
-
-        paragraphs = []
-        for p in soup.find_all(["p", "h2", "h3"]):
-            text = p.get_text(strip=True)
-            if len(text) > 30:
-                paragraphs.append(text)
-
-        content = " ".join(paragraphs)
-
-        if len(content) > max_chars:
-            content = content[:max_chars].rsplit(".", 1)[0] + "."
-
-        return content
-    except:
-        return None
-
-def smart_search(query):
-    """Busca y retorna informacion clara."""
-    print("  Buscando...", end="\r")
-
-    results = search_web(query)
-
-    for r in results:
-        link = r.get("href", "")
-        body = r.get("body", "")
-        title = r.get("title", "")
-
-        if body and len(body) > 40:
-            content = fetch_page(link, max_chars=1500)
-            if content and len(content) > 80:
-                print(" " * 20)
-                clean = clean_response(content, query)
-                return f"\n  {clean}\n\n  Fuente: {link}"
-
-    print(" " * 20)
     return None
 
-def clean_response(text, query):
-    """Limpia y acorta la respuesta."""
-    text = text.replace("[1]", "").replace("[2]", "").replace("[3]", "")
-    text = text.replace("[4]", "").replace("[5]", "").replace("[6]", "")
-    text = text.replace("[editar]", "").replace("Ir al contenido", "")
-    text = text.replace("De Wikipedia, la enciclopedia libre", "")
-    text = text.replace("Wikipedia", "").strip()
+# ============================================================================
+# GROQ API (Llama 3.1)
+# ============================================================================
 
-    sentences = text.split(".")
-    relevant = []
-    for s in sentences:
-        s = s.strip()
-        if len(s) > 20:
-            relevant.append(s)
-        if len(".".join(relevant)) > 800:
-            break
+def ask_ai(query, api_key):
+    """Pregunta a Groq (Llama 3.1)."""
+    try:
+        context = search_context(query)
+        if context:
+            messages = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"Contexto de internet: {context}\n\nPregunta: {query}"}
+            ]
+        else:
+            messages = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": query}
+            ]
 
-    return ". ".join(relevant) + "." if relevant else text[:800]
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"model": "llama-3.1-8b-instant", "messages": messages, "max_tokens": 500},
+            timeout=30
+        )
+
+        if r.status_code == 200:
+            return r.json()["choices"][0]["message"]["content"]
+        else:
+            return f"Error {r.status_code}: {r.json().get('error', {}).get('message', 'Desconocido')}"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 # ============================================================================
 # MAIN
@@ -109,13 +94,17 @@ def main():
     print("=" * 60)
     print("  Hola! Soy Monica, tu asistente inteligente")
     print("  Preguntame lo que quieras")
-    print("  Respondo SOLO en espanol")
     print("=" * 60)
     print()
 
-    saludos = ["hola", "buenas", "hey", "que tal", "hi", "hello", "buenos dias", "buenas tardes"]
-    despedidas = ["chao", "adios", "bye", "hasta luego", "nos vemos"]
-    agradecimientos = ["gracias", "thanks", "genial", "perfecto", "excelente", "bien"]
+    api_key = os.environ.get("GROQ_API_KEY", "")
+
+    print("  Listo! Preguntame lo que quieras.")
+    print()
+
+    saludos = ["hola", "buenas", "hey", "que tal", "hi", "hello"]
+    despedidas = ["chao", "adios", "bye", "hasta luego"]
+    gracias = ["gracias", "thanks", "genial", "perfecto"]
 
     while True:
         try:
@@ -133,24 +122,18 @@ def main():
             print("  Hasta luego!")
             break
 
-        if user_lower in ["/ayuda", "/help"]:
-            print("\n  Preguntame lo que quieras!")
-            print("  Escribe /salir para salir.\n")
-            continue
-
         if any(s in user_lower for s in saludos):
-            print(f"  {random.choice(['Hola! Que quieres saber?', 'Hey! Dime, en que te ayudo?', 'Hola! Preguntame lo que quieras.', 'Que tal! En que te puedo ayudar?'])}")
+            print(f"  {random.choice(['Hola! Que quieres saber?', 'Hey! Dime, en que te ayudo?', 'Hola! Preguntame lo que quieras.'])}")
             continue
 
-        if any(t in user_lower for t in agradecimientos):
-            print(f"  {random.choice(['De nada! Algo mas?', 'Para eso estoy!', 'Un placer!', 'Listo! Algo mas?'])}")
+        if any(t in user_lower for t in gracias):
+            print(f"  {random.choice(['De nada! Algo mas?', 'Para eso estoy!', 'Un placer!'])}")
             continue
 
-        result = smart_search(user_input)
-        if result:
-            print(result)
-        else:
-            print("  No encontre resultados. Intenta con otra pregunta.")
+        print("  Pensando...", end="\r")
+        response = ask_ai(user_input, api_key)
+        print(" " * 20)
+        print(f"\n  Monica > {response}\n")
 
 if __name__ == "__main__":
     main()
