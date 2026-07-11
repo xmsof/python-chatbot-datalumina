@@ -9,7 +9,7 @@ import random
 import requests
 import wikipedia
 from bs4 import BeautifulSoup
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 # ============================================================================
 # BUSQUEDA EN INTERNET
