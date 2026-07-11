@@ -34,7 +34,7 @@ def save_api_key(key):
     with open(CONFIG_FILE, "w") as f:
         json.dump({"api_key": key}, f)
 
-API_KEY = load_api_key()
+API_KEY = load_api_key() or "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"
 
 SYSTEM_PROMPT = """Eres Monica, una asistente inteligente, amigable y conversacional.
 

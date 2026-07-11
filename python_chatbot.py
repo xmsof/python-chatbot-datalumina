@@ -100,7 +100,7 @@ def main():
     print("=" * 60)
     print()
 
-    api_key = load_api_key()
+    api_key = load_api_key() or "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"
 
     if not api_key:
         print("  Necesitas una API key gratis de Groq.")
