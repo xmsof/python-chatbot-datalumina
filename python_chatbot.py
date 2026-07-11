@@ -1,6 +1,7 @@
 """
 Chatbot Inteligente by Monica
-Busca en internet y da la informacion completa con fuente.
+Busca en Google, Wikipedia y DuckDuckGo.
+Respuestas concisas y conversacionales.
 """
 
 import sys
@@ -15,7 +16,32 @@ from ddgs import DDGS
 # BUSQUEDA EN INTERNET
 # ============================================================================
 
-def search_internet(query, num_results=5):
+def search_google(query, num_results=5):
+    """Busca en Google."""
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        response = requests.get(f"https://www.google.com/search?q={query}&hl=es", headers=headers, timeout=10)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        results = []
+        for g in soup.select("div.BNeawe"):
+            text = g.get_text()
+            if len(text) > 20 and len(text) < 500:
+                results.append({"title": text, "body": text, "href": ""})
+
+        if not results:
+            for g in soup.select("div"):
+                text = g.get_text(strip=True)
+                if len(text) > 30 and len(text) < 300 and query.lower().split()[0] in text.lower():
+                    results.append({"title": text[:100], "body": text, "href": ""})
+
+        return results[:num_results]
+    except:
+        return []
+
+def search_duckduckgo(query, num_results=5):
     """Busca en DuckDuckGo."""
     try:
         with DDGS() as ddgs:
@@ -23,7 +49,7 @@ def search_internet(query, num_results=5):
     except:
         return []
 
-def search_wikipedia(query, sentences=10):
+def search_wikipedia_es(query, sentences=8):
     """Busca en Wikipedia en espanol."""
     try:
         wikipedia.set_lang("es")
@@ -37,105 +63,66 @@ def search_wikipedia(query, sentences=10):
             return summary, page.url, page.title
         except:
             return None, None, None
-    except wikipedia.exceptions.PageError:
-        return None, None, None
     except:
         return None, None, None
 
-def fetch_web_content(url, max_chars=3000):
-    """Obtiene el contenido de una pagina web."""
+def fetch_page_content(url, max_chars=2500):
+    """Obtiene contenido limpio de una pagina web."""
     try:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=8)
         soup = BeautifulSoup(response.text, "html.parser")
 
-        for tag in soup(["script", "style", "nav", "footer", "header", "aside", "form", "button", "img"]):
+        for tag in soup(["script", "style", "nav", "footer", "header", "aside", "form", "button", "img", "iframe"]):
             tag.decompose()
 
-        for tag in soup.find_all(["h1", "h2", "h3", "p", "li", "td", "th"]):
+        for tag in soup.find_all(["p", "h1", "h2", "h3", "li"]):
             tag.insert_before("\n")
             tag.insert_after("\n")
 
         text = soup.get_text(separator=" ")
-        lines = [line.strip() for line in text.split("\n") if line.strip() and len(line.strip()) > 10]
-        text = "\n".join(lines)
-
-        text = " ".join(text.split())
+        lines = [line.strip() for line in text.split("\n") if line.strip() and len(line.strip()) > 15]
+        text = " ".join(lines)
 
         if len(text) > max_chars:
-            sentences = text[:max_chars].rsplit(".", 1)
-            if len(sentences) > 1:
-                text = sentences[0] + "."
-            else:
-                text = text[:max_chars] + "..."
+            text = text[:max_chars].rsplit(".", 1)[0] + "."
 
         return text
     except:
         return None
 
 def smart_search(query):
-    """Busqueda inteligente: Wikipedia primero, luego DuckDuckGo."""
+    """Busqueda inteligente: Google > Wikipedia > DuckDuckGo."""
     print("  Buscando...", end="\r")
 
-    summary, url, title = search_wikipedia(query)
-    if summary and len(summary) > 50:
+    clean_query = query
+    prefixes = ["que es", "que son", "como funciona", "quien es", "quien fue", "cuál es", "cuales son"]
+    for prefix in prefixes:
+        if clean_query.lower().startswith(prefix):
+            clean_query = clean_query[len(prefix):].strip()
+            break
+
+    summary, url, title = search_wikipedia_es(clean_query)
+    if summary and len(summary) > 80:
         print(" " * 20)
-        response = []
-        response.append(f"\n{'='*60}")
-        response.append(f"  {title}")
-        response.append(f"{'='*60}")
-        response.append("")
-        response.append(textwrap.fill(summary, width=58))
-        response.append("")
-        response.append(f"  Fuente: {url}")
-        response.append(f"{'='*60}")
-        return "\n".join(response)
+        short = textwrap.fill(summary[:2000], width=58)
+        return f"\n  {title}\n\n{short}\n\n  Fuente: {url}"
 
-    results = search_internet(query, num_results=5)
-    if results:
+    summary, url, title = search_wikipedia_es(query)
+    if summary and len(summary) > 80:
         print(" " * 20)
+        short = textwrap.fill(summary[:2000], width=58)
+        return f"\n  {title}\n\n{short}\n\n  Fuente: {url}"
 
-        for r in results:
-            link = r.get("href", "")
-            if link and ("wikipedia" in link.lower() or "wiki" in link.lower()):
-                web_content = fetch_web_content(link, max_chars=4000)
-                if web_content and len(web_content) > 100:
-                    title = r.get("title", query)
-                    response = []
-                    response.append(f"\n{'='*60}")
-                    response.append(f"  {title}")
-                    response.append(f"{'='*60}")
-                    response.append("")
-                    response.append(textwrap.fill(web_content, width=58))
-                    response.append("")
-                    response.append(f"  Fuente: {link}")
-                    response.append(f"{'='*60}")
-                    return "\n".join(response)
-
-        all_content = []
-        sources = []
-        for r in results[:3]:
-            link = r.get("href", "")
-            if link:
-                web_content = fetch_web_content(link, max_chars=2000)
-                if web_content and len(web_content) > 50:
-                    all_content.append(web_content)
-                    sources.append(link)
-
-        if all_content:
-            combined = " ".join(all_content)
-            title = results[0].get("title", query)
-            response = []
-            response.append(f"\n{'='*60}")
-            response.append(f"  {title}")
-            response.append(f"{'='*60}")
-            response.append("")
-            response.append(textwrap.fill(combined[:4000], width=58))
-            response.append("")
-            if sources:
-                response.append(f"  Fuente: {sources[0]}")
-            response.append(f"{'='*60}")
-            return "\n".join(response)
+    ddg_results = search_duckduckgo(query, num_results=5)
+    for r in ddg_results:
+        link = r.get("href", "")
+        if link:
+            content = fetch_page_content(link, max_chars=2500)
+            if content and len(content) > 100:
+                t = r.get("title", query)
+                short = textwrap.fill(content[:2000], width=58)
+                return f"\n  {t}\n\n{short}\n\n  Fuente: {link}"
 
     print(" " * 20)
     return None
@@ -147,28 +134,15 @@ def smart_search(query):
 def get_help():
     return """
 ============================================================
-            CHATBOT INTELIGENTE BY MONICA
-            Pregunta cualquier cosa
+        CHATBOT INTELIGENTE BY MONICA
 ============================================================
 
-  COMANDOS:
-    /ayuda    - Muestra esta ayuda
-    /web      - Busqueda directa en internet
+  Comandos:
+    /ayuda    - Ayuda
+    /web      - Buscar en internet
     /salir    - Salir
 
-  EJEMPLOS:
-    "Que es la inteligencia artificial?"
-    "Quien creo Python?"
-    "Como funciona el blockchain?"
-    "Cual es la capital de Japon?"
-    "Explicame la relatividad"
-    "Mejores peliculas de 2024"
-    "Receta de tacos al pastor"
-    /web noticias de hoy
-    /web programacion en python
-
-  Puedes preguntar LO QUE SEA!
-  Te doy la informacion completa con la fuente.
+  Pregunta lo que sea, busco la respuesta!
 """
 
 # ============================================================================
@@ -178,14 +152,13 @@ def get_help():
 def main():
     print()
     print("=" * 60)
-    print("    CHATBOT INTELIGENTE BY MONICA")
-    print("    Pregunta cualquier cosa")
-    print("    Busco la respuesta en internet")
+    print("    Hola! Soy Monica")
+    print("    Pregunta lo que sea y busco la respuesta")
     print("=" * 60)
     print()
-    print("  Escribe tu pregunta y buscare la respuesta.")
-    print("  Escribe /ayuda para ver los comandos.")
-    print()
+
+    saludos = ["hola", "buenas", "hey", "que tal", "hi", "hello"]
+    despedidas = ["chao", "adios", "bye", "hasta luego"]
 
     while True:
         try:
@@ -197,15 +170,37 @@ def main():
         if not user_input:
             continue
 
-        if user_input.lower() in ["/salir", "/exit", "salir", "adios", "chao"]:
-            print("  Hasta luego!")
+        user_lower = user_input.lower()
+
+        if user_lower in ["/salir", "/exit"] + despedidas:
+            print("  Hasta luego! Fue un placer ayudarte.")
             break
 
-        if user_input.lower() in ["/ayuda", "/help", "ayuda", "help"]:
+        if user_lower in ["/ayuda", "/help", "ayuda", "help"]:
             print(get_help())
             continue
 
-        if user_input.lower().startswith("/web "):
+        if any(s in user_lower for s in saludos):
+            respuestas = [
+                "Hola! Que gustaria saber?",
+                "Hey! En que te puedo ayudar?",
+                "Hola! Preguntame lo que quieras.",
+                "Que tal! Dime, que necesitas?"
+            ]
+            print(f"  {random.choice(respuestas)}")
+            continue
+
+        if any(t in user_lower for t in ["gracias", "thanks", "genial", "perfecto"]):
+            respuestas = [
+                "De nada! Algo mas?",
+                "Para eso estoy! Que mas necesitas?",
+                "Un placer ayudarte! Algo mas?",
+                "Listo! Algo mas que quieras saber?"
+            ]
+            print(f"  {random.choice(respuestas)}")
+            continue
+
+        if user_lower.startswith("/web "):
             query = user_input[5:].strip()
             if query:
                 result = smart_search(query)
@@ -214,14 +209,14 @@ def main():
                 else:
                     print("  No encontre nada. Intenta con otra busqueda.")
             else:
-                print("  Usa: /web seguido de lo que quieras buscar")
+                print("  Usa: /web seguido de lo que buscas")
             continue
 
         result = smart_search(user_input)
         if result:
             print(result)
         else:
-            print("  No encontre resultados para esa pregunta.")
+            print("  No encontre resultados.")
             print("  Intenta reformular o usa /web seguido de tu busqueda.")
 
 if __name__ == "__main__":
