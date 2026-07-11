@@ -88,10 +88,10 @@ def smart_search(query):
 
 def get_help():
     return """
-╔══════════════════════════════════════════════════════════════╗
-║            CHATBOT INTELIGENTE BY MONICA                     ║
-║            Pregunta cualquier cosa                           ║
-╚══════════════════════════════════════════════════════════════╝
+============================================================
+            CHATBOT INTELIGENTE BY MONICA
+            Pregunta cualquier cosa
+============================================================
 
   COMANDOS:
     /ayuda    - Muestra esta ayuda
@@ -118,11 +118,11 @@ def get_help():
 
 def main():
     print()
-    print("╔" + "═"*58 + "╗")
-    print("║" + " "*12 + "CHATBOT INTELIGENTE BY MONICA" + " "*16 + "║")
-    print("║" + " "*14 + "Pregunta cualquier cosa" + " "*20 + "║")
-    print("║" + " "*12 + "Busco la respuesta en internet" + " "*15 + "║")
-    print("╚" + "═"*58 + "╝")
+    print("=" * 60)
+    print("    CHATBOT INTELIGENTE BY MONICA")
+    print("    Pregunta cualquier cosa")
+    print("    Busco la respuesta en internet")
+    print("=" * 60)
     print()
     print("  Escribe tu pregunta y buscare la respuesta.")
     print("  Escribe /ayuda para ver los comandos.")
